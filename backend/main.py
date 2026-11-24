@@ -1,5 +1,12 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from routers import assignments
 import models
 from database import engine
