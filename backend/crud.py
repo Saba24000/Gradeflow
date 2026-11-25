@@ -28,7 +28,8 @@ def delete_assignment(db: Session, assignment_id: int):
     if db_item:
         db.delete(db_item)
         db.commit()
-    return db_itemfrom sqlalchemy.orm import Session
+    return db_item
+from sqlalchemy.orm import Session
 import models, schemas
 
 def get_assignments(db: Session):
