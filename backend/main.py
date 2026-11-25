@@ -2,14 +2,12 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
-import sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from routers import assignments
 import models
 from database import engine
+from routers import admin, assignments, auth
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -23,4 +21,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(assignments.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(assignments.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
+
+
+@app.get("/api/health")
+def health_check():
+    return {"status": "ok"}
