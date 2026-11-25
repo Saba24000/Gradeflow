@@ -1,4 +1,12 @@
+import os
+import sys
 import traceback
+
+# Ensure /var/task/backend is on Python's import path on Vercel
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
