@@ -1,2 +1,0 @@
-import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
-export const TaskList = ({ assignments, onDelete }) => (_jsx("div", { children: assignments.map((item) => (_jsxs("div", { style: { border: '1px solid #ccc', padding: '10px', margin: '10px 0' }, children: [_jsxs("h3", { children: [item.title, " (", item.course_code, ")"] }), _jsx("p", { children: item.description }), _jsxs("p", { children: [_jsx("strong", { children: "Due:" }), " ", item.due_date] }), _jsx("button", { onClick: () => item.id && onDelete(item.id), children: "Delete" })] }, item.id))) }));

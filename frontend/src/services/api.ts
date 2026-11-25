@@ -1,96 +1,136 @@
 const API_BASE = "/api";
 
-function getAuthHeaders(): HeadersInit {
-  const token = localStorage.getItem("token");
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: "user" | "admin";
+  is_banned?: boolean;
+  ban_reason?: string | null;
+  created_at?: string;
+}
+
+export interface Assignment {
+  id: number;
+  title: string;
+  course_code: string;
+  description: string;
+  due_date: string;
+  status: string;
+  owner_id: number;
+  group_id: number | null;
+  assigned_to_id: number | null;
+}
+
+export interface GroupMember {
+  user_id: number;
+  email: string;
+  permissions: string[];
+}
+
+export interface Group {
+  id: number;
+  name: string;
+  description: string;
+  owner_id: number;
+  members: GroupMember[];
+}
+
+function extractErrorMessage(data: any, fallback: string): string {
+  if (!data) return fallback;
+  if (typeof data === "string") return data;
+  if (typeof data.detail === "string") return data.detail;
+  if (Array.isArray(data.detail)) {
+    return data.detail
+      .map((err: any) => {
+        const field = Array.isArray(err.loc) ? err.loc[err.loc.length - 1] : "";
+        return field ? `${field}: ${err.msg}` : err.msg;
+      })
+      .join(" | ");
+  }
+  return fallback;
+}
+
+export function getStoredTokens() {
   return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    accessToken: localStorage.getItem("access_token"),
+    refreshToken: localStorage.getItem("refresh_token"),
   };
 }
 
-export async function signupUser(email: string, password: string) {
-  const res = await fetch(`${API_BASE}/auth/signup`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.detail || "Signup failed");
+export function saveAuthSession(accessToken: string, refreshToken: string, user: User) {
+  localStorage.setItem("access_token", accessToken);
+  localStorage.setItem("refresh_token", refreshToken);
+  localStorage.setItem("user", JSON.stringify(user));
+}
+
+export function clearAuthSession() {
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
+  localStorage.removeItem("user");
+}
+
+async function tryRefreshToken(): Promise<string | null> {
+  const { refreshToken } = getStoredTokens();
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    saveAuthSession(data.access_token, data.refresh_token, data.user);
+    return data.access_token;
+  } catch {
+    return null;
   }
-  return res.json();
 }
 
-export async function loginUser(email: string, password: string) {
-  const formData = new URLSearchParams();
-  formData.append("username", email);
-  formData.append("password", password);
-
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: formData.toString(),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.detail || "Invalid credentials");
+export async function apiFetch<T = any>(
+  path: string,
+  options: RequestInit = {},
+  retry = true
+): Promise<T> {
+  const { accessToken } = getStoredTokens();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(options.headers as Record<string, string>),
+  };
+  if (accessToken) {
+    headers["Authorization"] = `Bearer ${accessToken}`;
   }
-  return res.json();
-}
 
-export async function fetchAssignments() {
-  const res = await fetch(`${API_BASE}/assignments/`, {
-    headers: getAuthHeaders(),
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers,
+    credentials: "include",
   });
-  if (!res.ok) throw new Error("Failed to load assignments");
-  return res.json();
-}
 
-export async function createAssignment(data: {
-  title: string;
-  course: string;
-  due_date: string;
-  status?: string;
-}) {
-  const res = await fetch(`${API_BASE}/assignments/`, {
-    method: "POST",
-    headers: getAuthHeaders(),
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) throw new Error("Failed to create assignment");
-  return res.json();
-}
+  if (res.status === 401 && retry && !path.startsWith("/auth/login") && !path.startsWith("/auth/signup")) {
+    const newToken = await tryRefreshToken();
+    if (newToken) {
+      return apiFetch<T>(path, options, false);
+    }
+    clearAuthSession();
+    window.dispatchEvent(new Event("auth:expired"));
+    throw new Error("Session expired. Please log in again.");
+  }
 
-export async function deleteAssignment(id: number) {
-  const res = await fetch(`${API_BASE}/assignments/${id}`, {
-    method: "DELETE",
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to delete assignment");
-}
+  const text = await res.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    if (!res.ok) {
+      throw new Error(`Server error (${res.status}): ${text.slice(0, 120) || res.statusText}`);
+    }
+  }
 
-export async function fetchAdminStats() {
-  const res = await fetch(`${API_BASE}/admin/stats`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to fetch admin stats");
-  return res.json();
-}
+  if (!res.ok) {
+    throw new Error(extractErrorMessage(data, `Request failed (${res.status})`));
+  }
 
-export async function fetchAllUsers() {
-  const res = await fetch(`${API_BASE}/admin/users`, {
-    headers: getAuthHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to fetch users");
-  return res.json();
-}
-
-export async function updateUserRole(userId: number, role: "user" | "admin") {
-  const res = await fetch(`${API_BASE}/admin/users/${userId}/role`, {
-    method: "PATCH",
-    headers: getAuthHeaders(),
-    body: JSON.stringify({ role }),
-  });
-  if (!res.ok) throw new Error("Failed to update user role");
-  return res.json();
+  return data as T;
 }
