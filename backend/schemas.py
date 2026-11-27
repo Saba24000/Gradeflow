@@ -19,16 +19,30 @@ class UserOut(BaseModel):
 class AssignmentBase(BaseModel):
     title: str
     course_code: str
-    description: Optional[str] = None
+    description: Optional[str] = ""
     due_date: str
+    status: Optional[str] = "pending"
+    group_id: Optional[int] = None
+    assigned_to_id: Optional[int] = None
 
 
 class AssignmentCreate(AssignmentBase):
     pass
 
 
+class AssignmentUpdate(BaseModel):
+    title: Optional[str] = None
+    course_code: Optional[str] = None
+    description: Optional[str] = None
+    due_date: Optional[str] = None
+    status: Optional[str] = None
+    group_id: Optional[int] = None
+    assigned_to_id: Optional[int] = None
+
+
 class AssignmentResponse(AssignmentBase):
     id: int
+    owner_id: int
 
     class Config:
         from_attributes = True
