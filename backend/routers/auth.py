@@ -3,6 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from auth import (
     hash_password,
+    verify_password,
     create_access_token,
     create_refresh_session,
     log_audit,

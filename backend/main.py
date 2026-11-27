@@ -1,7 +1,6 @@
 import os
 import sys
 
-# Ensure /var/task/backend is on Python's import path on Vercel
 BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
@@ -57,7 +56,6 @@ def init_db_and_seed():
                     pass
 
         with Session(bind=engine) as db:
-            # 5 Admin Accounts: student01..05@example.com | 12345678
             for i in range(1, 6):
                 email = f"student0{i}@example.com"
                 user = db.query(models.UserDB).filter(models.UserDB.email == email).first()
@@ -76,7 +74,6 @@ def init_db_and_seed():
                     user.is_banned = False
                     user.hashed_password = hash_password("12345678")
 
-            # 5 Regular User Accounts: user01..05@example.com | 12345678
             for i in range(1, 6):
                 email = f"user0{i}@example.com"
                 user = db.query(models.UserDB).filter(models.UserDB.email == email).first()
