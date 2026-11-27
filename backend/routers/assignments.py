@@ -4,7 +4,8 @@ from typing import List
 import schemas, crud
 from database import get_db
 
-router = APIRouter(prefix="/api/assignments", tags=["assignments"])
+# Line 7 in backend/routers/assignments.py
+router = APIRouter(prefix="/assignments", tags=["assignments"])
 
 @router.get("", response_model=List[schemas.AssignmentResponse])
 def read_assignments(db: Session = Depends(get_db)):
