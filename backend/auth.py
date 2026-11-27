@@ -111,4 +111,5 @@ def get_current_user(
             status_code=403,
             detail=f"Account suspended: {user.ban_reason or 'Contact admin'}",
         )
-    return user
+    return user 
+

@@ -1,7 +1,13 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional 
+from fastapi import APIRouter, Depends, HTTPException, Request
+from auth import (
+    hash_password,
+    create_access_token,
+    create_refresh_session,
+    log_audit,
+)
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
@@ -292,4 +298,109 @@ def revoke_session(
     session.revoked = True
     db.commit()
     auth.log_audit(db, "session_revoked", user=current_user, detail=f"Revoked session #{session_id}", request=request)
-    return {"detail": "Session revoked"}
+    return {"detail": "Session revoked"} 
+@router.post("/guest")
+def guest_login(request: Request, db: Session = Depends(get_db)):
+    guest_email = "demo@gradeflow.app"
+    guest_user = db.query(models.UserDB).filter(models.UserDB.email == guest_email).first()
+
+    if not guest_user:
+        guest_user = models.UserDB(
+            name="Guest Student",
+            email=guest_email,
+            hashed_password=hash_password("GuestDemo@2026"),
+            role="user",
+            is_banned=False,
+        )
+        db.add(guest_user)
+        db.commit()
+        db.refresh(guest_user)
+
+    # Seed starter study groups for Guest Demo
+    existing_groups = (
+        db.query(models.GroupDB)
+        .filter(models.GroupDB.owner_id == guest_user.id)
+        .all()
+    )
+    if len(existing_groups) == 0:
+        demo_groups = [
+            models.GroupDB(
+                name="CSE309 Web Security Team",
+                description="Final project & RBAC demo group",
+                owner_id=guest_user.id,
+            ),
+            models.GroupDB(
+                name="CSE370 Database Study Group",
+                description="SQL & ER modeling collaboration",
+                owner_id=guest_user.id,
+            ),
+            models.GroupDB(
+                name="CSE422 AI Lab Partners",
+                description="Search algorithms & ML lab group",
+                owner_id=guest_user.id,
+            ),
+        ]
+        db.add_all(demo_groups)
+        db.commit()
+        for g in demo_groups:
+            db.refresh(g)
+            db.add(
+                models.GroupMemberDB(
+                    group_id=g.id,
+                    user_id=guest_user.id,
+                    permissions="create,update,assign",
+                )
+            )
+        db.commit()
+
+    # Seed starter course assignments for Guest Demo
+    existing_count = (
+        db.query(models.AssignmentDB)
+        .filter(models.AssignmentDB.owner_id == guest_user.id)
+        .count()
+    )
+    if existing_count == 0:
+        starter_assignments = [
+            models.AssignmentDB(
+                title="RBAC & JWT Security Audit Report",
+                course_code="CSE309",
+                description="Document authentication flow, token rotation, and role-based access rules.",
+                due_date="2026-12-05",
+                status="pending",
+                owner_id=guest_user.id,
+            ),
+            models.AssignmentDB(
+                title="ER Diagram & Relational Schema Normalization",
+                course_code="CSE370",
+                description="Normalize university database schema up to 3NF and verify foreign keys.",
+                due_date="2026-12-09",
+                status="pending",
+                owner_id=guest_user.id,
+            ),
+            models.AssignmentDB(
+                title="A* Search & Heuristic Pathfinding Lab",
+                course_code="CSE422",
+                description="Compare Manhattan vs Euclidean heuristics on grid mazes.",
+                due_date="2026-12-14",
+                status="pending",
+                owner_id=guest_user.id,
+            ),
+        ]
+        db.add_all(starter_assignments)
+        db.commit()
+
+    access_token = create_access_token(guest_user)
+    refresh_token = create_refresh_session(db, guest_user, request)
+    log_audit(db, "GUEST_LOGIN", user=guest_user, detail="Demo guest session started", request=request)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user": {
+            "id": guest_user.id,
+            "name": guest_user.name,
+            "email": guest_user.email,
+            "role": guest_user.role,
+        },
+    }
