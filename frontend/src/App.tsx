@@ -11,11 +11,111 @@ import {
 
 type Tab = "assignments" | "groups" | "profile" | "admin";
 
+const styles: Record<string, React.CSSProperties> = {
+  page: {
+    minHeight: "100vh",
+    background: "linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)",
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    color: "#0f172a",
+    paddingBottom: 48,
+  },
+  authWrap: {
+    minHeight: "100vh",
+    background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #1d4ed8 100%)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  },
+  authCard: {
+    width: "100%",
+    maxWidth: 420,
+    background: "#ffffff",
+    borderRadius: 16,
+    padding: "36px 32px",
+    boxShadow: "0 20px 45px rgba(15, 23, 42, 0.25)",
+  },
+  navbar: {
+    background: "#ffffff",
+    borderBottom: "1px solid #e2e8f0",
+    boxShadow: "0 1px 3px rgba(15, 23, 42, 0.04)",
+    position: "sticky",
+    top: 0,
+    zIndex: 20,
+  },
+  navInner: {
+    maxWidth: 1120,
+    margin: "0 auto",
+    padding: "14px 24px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  container: {
+    maxWidth: 1120,
+    margin: "28px auto",
+    padding: "0 24px",
+  },
+  card: {
+    background: "#ffffff",
+    borderRadius: 14,
+    padding: 24,
+    border: "1px solid #e2e8f0",
+    boxShadow: "0 4px 14px rgba(15, 23, 42, 0.04)",
+    marginBottom: 24,
+  },
+  input: {
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1px solid #cbd5e1",
+    fontSize: 14,
+    outline: "none",
+    background: "#ffffff",
+    color: "#0f172a",
+    width: "100%",
+    boxSizing: "border-box",
+  },
+  primaryBtn: {
+    padding: "10px 18px",
+    borderRadius: 8,
+    border: "none",
+    background: "#2563eb",
+    color: "#ffffff",
+    fontWeight: 600,
+    fontSize: 14,
+    cursor: "pointer",
+  },
+  secondaryBtn: {
+    padding: "8px 14px",
+    borderRadius: 8,
+    border: "1px solid #cbd5e1",
+    background: "#ffffff",
+    color: "#334155",
+    fontWeight: 500,
+    fontSize: 13,
+    cursor: "pointer",
+  },
+  dangerBtn: {
+    padding: "8px 14px",
+    borderRadius: 8,
+    border: "1px solid #fecaca",
+    background: "#fef2f2",
+    color: "#dc2626",
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: "pointer",
+  },
+};
+
 export function App() {
   const [user, setUser] = useState<User | null>(() => {
     const raw = localStorage.getItem("user");
     return raw ? JSON.parse(raw) : null;
   });
+
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -40,7 +140,7 @@ export function App() {
   const [groupName, setGroupName] = useState("");
   const [groupDesc, setGroupDesc] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
-  const [memberPerms, setMemberPerms] = useState<string[]>(["create"]);
+  const [memberPerms, setMemberPerms] = useState<string[]>(["create", "update"]);
   const [activeGroupId, setActiveGroupId] = useState<number | null>(null);
 
   // Profile & Sessions state
@@ -144,6 +244,26 @@ export function App() {
       setPassword("");
     } catch (err: any) {
       setAuthError(err.message || "Authentication failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGuestLogin() {
+    setAuthError("");
+    setLoading(true);
+    try {
+      const data = await apiFetch<{
+        access_token: string;
+        refresh_token: string;
+        user: User;
+      }>("/auth/guest", { method: "POST" });
+
+      saveAuthSession(data.access_token, data.refresh_token, data.user);
+      setUser(data.user);
+      notify("Welcome! Exploring GradeFlow in Guest Demo Mode.");
+    } catch (err: any) {
+      setAuthError(err.message || "Could not start guest demo");
     } finally {
       setLoading(false);
     }
@@ -286,7 +406,7 @@ export function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `gradeflow_${resource}.csv`;
+    a.download = `gradeflow-${resource}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -294,291 +414,722 @@ export function App() {
   // AUTH SCREEN
   if (!user) {
     return (
-      <div style={{ maxWidth: 420, margin: "60px auto", fontFamily: "system-ui, sans-serif", padding: 24, border: "1px solid #e2e8f0", borderRadius: 12 }}>
-        <h1 style={{ marginBottom: 4 }}>GradeFlow</h1>
-        <h2 style={{ marginTop: 0, color: "#334155" }}>
-          {authMode === "signup" ? "Create Account" : "Sign In"}
-        </h2>
-
-        {authError && (
-          <div style={{ background: "#fee2e2", color: "#991b1b", padding: "10px 12px", borderRadius: 8, marginBottom: 14, fontSize: 14 }}>
-            {authError}
+      <div style={styles.authWrap}>
+        <div style={styles.authCard}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: "linear-gradient(135deg, #2563eb, #4f46e5)",
+                color: "#fff",
+                fontWeight: 800,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 18,
+              }}
+            >
+              G
+            </div>
+            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: "#0f172a" }}>GradeFlow</h1>
           </div>
-        )}
+          <p style={{ marginTop: 4, marginBottom: 22, color: "#64748b", fontSize: 14 }}>
+            {authMode === "signup"
+              ? "Create your student workspace to organize courses & study groups."
+              : "Sign in to manage coursework, deadlines, and collaborative groups."}
+          </p>
 
-        <form onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {authMode === "signup" && (
-            <input
-              type="text"
-              placeholder="Full Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              style={{ padding: 10, borderRadius: 6, border: "1px solid #cbd5e1" }}
-            />
+          {authError && (
+            <div
+              style={{
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                color: "#b91c1c",
+                padding: "10px 12px",
+                borderRadius: 8,
+                fontSize: 13,
+                marginBottom: 14,
+              }}
+            >
+              {authError}
+            </div>
           )}
-          <input
-            type="email"
-            placeholder="Email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            style={{ padding: 10, borderRadius: 6, border: "1px solid #cbd5e1" }}
-          />
-          <input
-            type="password"
-            placeholder="Password (min 6 characters)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            style={{ padding: 10, borderRadius: 6, border: "1px solid #cbd5e1" }}
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            style={{ padding: 11, borderRadius: 6, border: "none", background: "#2563eb", color: "#fff", fontWeight: 600, cursor: "pointer" }}
-          >
-            {loading ? "Please wait..." : authMode === "signup" ? "Sign Up" : "Log In"}
-          </button>
-        </form>
 
-        <p style={{ marginTop: 16, fontSize: 14 }}>
-          {authMode === "signup" ? "Already have an account? " : "Don't have an account? "}
+          <form onSubmit={handleAuthSubmit} style={{ display: "grid", gap: 12 }}>
+            {authMode === "signup" && (
+              <input
+                type="text"
+                placeholder="Full Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                style={styles.input}
+              />
+            )}
+            <input
+              type="email"
+              placeholder="Email address"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              style={styles.input}
+            />
+            <input
+              type="password"
+              placeholder="Password (min 6 characters)"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+              style={styles.input}
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              style={{ ...styles.primaryBtn, padding: "12px 18px", marginTop: 4 }}
+            >
+              {loading ? "Please wait..." : authMode === "signup" ? "Create Account" : "Log In"}
+            </button>
+          </form>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0" }}>
+            <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+            <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600 }}>OR</span>
+            <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+          </div>
+
           <button
             type="button"
-            onClick={() => {
-              setAuthMode(authMode === "signup" ? "login" : "signup");
-              setAuthError("");
+            disabled={loading}
+            onClick={handleGuestLogin}
+            style={{
+              width: "100%",
+              padding: "11px 16px",
+              borderRadius: 8,
+              border: "1px solid #bfdbfe",
+              background: "#eff6ff",
+              color: "#1d4ed8",
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: "pointer",
             }}
-            style={{ background: "none", border: "none", color: "#2563eb", textDecoration: "underline", cursor: "pointer", padding: 0 }}
           >
-            {authMode === "signup" ? "Log In" : "Sign Up"}
+            Explore as Guest (Sample Courses Included)
           </button>
-        </p>
+
+          <p style={{ marginTop: 20, marginBottom: 0, fontSize: 14, textAlign: "center", color: "#475569" }}>
+            {authMode === "signup" ? "Already have an account? " : "Don't have an account? "}
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode(authMode === "signup" ? "login" : "signup");
+                setAuthError("");
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                color: "#2563eb",
+                fontWeight: 600,
+                cursor: "pointer",
+                padding: 0,
+              }}
+            >
+              {authMode === "signup" ? "Log In" : "Sign Up"}
+            </button>
+          </p>
+        </div>
       </div>
     );
   }
 
+  const isGuest = user.email === "guest@gradeflow.app";
+
   // MAIN PORTAL
   return (
-    <div style={{ maxWidth: 1050, margin: "24px auto", fontFamily: "system-ui, sans-serif", padding: "0 16px" }}>
-      <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: 12, marginBottom: 20 }}>
-        <div>
-          <strong style={{ fontSize: 22 }}>GradeFlow</strong>
-          <span style={{ marginLeft: 12, fontSize: 13, background: user.role === "admin" ? "#fef3c7" : "#e0f2fe", padding: "3px 8px", borderRadius: 999 }}>
-            {user.email} ({user.role})
-          </span>
-        </div>
-        <nav style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => setActiveTab("assignments")} style={{ fontWeight: activeTab === "assignments" ? 700 : 400 }}>Assignments</button>
-          <button onClick={() => setActiveTab("groups")} style={{ fontWeight: activeTab === "groups" ? 700 : 400 }}>Groups</button>
-          <button onClick={() => setActiveTab("profile")} style={{ fontWeight: activeTab === "profile" ? 700 : 400 }}>Profile & Sessions</button>
-          {user.role === "admin" && (
-            <button onClick={() => setActiveTab("admin")} style={{ fontWeight: activeTab === "admin" ? 700 : 400, background: "#1e293b", color: "#fff" }}>
-              Admin Dashboard
+    <div style={styles.page}>
+      <header style={styles.navbar}>
+        <div style={styles.navInner}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 9,
+                background: "linear-gradient(135deg, #2563eb, #4f46e5)",
+                color: "#fff",
+                fontWeight: 800,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 16,
+              }}
+            >
+              G
+            </div>
+            <strong style={{ fontSize: 20, letterSpacing: "-0.02em" }}>GradeFlow</strong>
+            <span
+              style={{
+                padding: "4px 10px",
+                borderRadius: 999,
+                background: isGuest ? "#fef3c7" : "#eff6ff",
+                color: isGuest ? "#92400e" : "#1d4ed8",
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              {user.email} ({isGuest ? "guest demo" : user.role})
+            </span>
+          </div>
+
+          <nav style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {(["assignments", "groups", "profile"] as Tab[]).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: activeTab === tab ? "1px solid #2563eb" : "1px solid #e2e8f0",
+                  background: activeTab === tab ? "#2563eb" : "#ffffff",
+                  color: activeTab === tab ? "#ffffff" : "#334155",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  textTransform: "capitalize",
+                }}
+              >
+                {tab === "profile" ? "Profile & Sessions" : tab}
+              </button>
+            ))}
+            {user.role === "admin" && (
+              <button
+                onClick={() => setActiveTab("admin")}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: 8,
+                  border: activeTab === "admin" ? "1px solid #4f46e5" : "1px solid #e2e8f0",
+                  background: activeTab === "admin" ? "#4f46e5" : "#ffffff",
+                  color: activeTab === "admin" ? "#ffffff" : "#334155",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                Admin Dashboard
+              </button>
+            )}
+            <button onClick={handleLogout} style={styles.dangerBtn}>
+              Logout
             </button>
-          )}
-          <button onClick={handleLogout} style={{ color: "#dc2626" }}>Logout</button>
-        </nav>
+          </nav>
+        </div>
       </header>
 
-      {toast && (
-        <div style={{ background: "#ecfdf5", border: "1px solid #6ee7b7", color: "#065f46", padding: 10, borderRadius: 8, marginBottom: 16 }}>
-          {toast}
-        </div>
-      )}
+      <main style={styles.container}>
+        {isGuest && (
+          <div
+            style={{
+              background: "#fffbeb",
+              border: "1px solid #fde68a",
+              color: "#92400e",
+              padding: "12px 16px",
+              borderRadius: 10,
+              marginBottom: 20,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 10,
+              fontSize: 13,
+            }}
+          >
+            <span>
+              <strong>Guest Demo Mode:</strong> Pre-loaded with sample CSE assignments so anyone can try adding,
+              editing, or organizing coursework immediately.
+            </span>
+            <button
+              onClick={handleLogout}
+              style={{
+                background: "#92400e",
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                padding: "6px 12px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Create Personal Account
+            </button>
+          </div>
+        )}
 
-      {/* ASSIGNMENTS TAB */}
-      {activeTab === "assignments" && (
-        <div>
-          <h3>{editingId ? "Edit Assignment" : "New Assignment"}</h3>
-          <form onSubmit={handleSaveAssignment} style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginBottom: 24 }}>
-            <input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-            <input placeholder="Course Code (e.g. CSE309)" value={courseCode} onChange={(e) => setCourseCode(e.target.value)} required />
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} required />
-            <input placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} />
-            <select value={selectedGroupId} onChange={(e) => setSelectedGroupId(e.target.value)}>
-              <option value="">Personal (Only Me)</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>Group: {g.name}</option>
-              ))}
-            </select>
-            <button type="submit">{editingId ? "Update" : "Add Assignment"}</button>
-          </form>
+        {toast && (
+          <div
+            style={{
+              background: "#ecfdf5",
+              border: "1px solid #a7f3d0",
+              color: "#065f46",
+              padding: "12px 16px",
+              borderRadius: 10,
+              marginBottom: 20,
+              fontWeight: 500,
+              fontSize: 14,
+            }}
+          >
+            {toast}
+          </div>
+        )}
 
-          <h3>Assignments ({assignments.length})</h3>
-          <table width="100%" cellPadding={8} style={{ borderCollapse: "collapse", border: "1px solid #e2e8f0" }}>
-            <thead>
-              <tr style={{ background: "#f8fafc", textAlign: "left" }}>
-                <th>Title</th>
-                <th>Course</th>
-                <th>Due Date</th>
-                <th>Scope</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {assignments.map((a) => (
-                <tr key={a.id} style={{ borderTop: "1px solid #e2e8f0" }}>
-                  <td><strong>{a.title}</strong><div style={{ fontSize: 12, color: "#64748b" }}>{a.description}</div></td>
-                  <td>{a.course_code}</td>
-                  <td>{a.due_date}</td>
-                  <td>{a.group_id ? `Group #${a.group_id}` : "Personal"}</td>
-                  <td style={{ display: "flex", gap: 6 }}>
-                    <button onClick={() => {
-                      setEditingId(a.id);
-                      setTitle(a.title);
-                      setCourseCode(a.course_code);
-                      setDescription(a.description);
-                      setDueDate(a.due_date);
-                      setSelectedGroupId(a.group_id ? String(a.group_id) : "");
-                    }}>Edit</button>
-                    <button onClick={() => handleDeleteAssignment(a.id)} style={{ color: "#dc2626" }}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* GROUPS & PERMISSIONS TAB */}
-      {activeTab === "groups" && (
-        <div>
-          <h3>Create Shared Group</h3>
-          <form onSubmit={handleCreateGroup} style={{ display: "flex", gap: 10, marginBottom: 24 }}>
-            <input placeholder="Group Name" value={groupName} onChange={(e) => setGroupName(e.target.value)} required />
-            <input placeholder="Description" value={groupDesc} onChange={(e) => setGroupDesc(e.target.value)} />
-            <button type="submit">Create Group</button>
-          </form>
-
-          {groups.map((g) => (
-            <div key={g.id} style={{ border: "1px solid #cbd5e1", borderRadius: 8, padding: 14, marginBottom: 14 }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <div>
-                  <strong>{g.name}</strong> — <span style={{ color: "#64748b" }}>{g.description}</span>
-                </div>
-                {g.owner_id === user.id && (
-                  <button onClick={() => setActiveGroupId(activeGroupId === g.id ? null : g.id)}>
-                    Manage Members
-                  </button>
-                )}
-              </div>
-
-              <div style={{ marginTop: 8, fontSize: 13 }}>
-                Members:{" "}
-                {g.members.length === 0
-                  ? "None yet"
-                  : g.members.map((m) => `${m.email} [${m.permissions.join(", ")}]`).join(" | ")}
-              </div>
-
-              {activeGroupId === g.id && (
-                <form onSubmit={(e) => handleAddMember(e, g.id)} style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-                  <input type="email" placeholder="Member email" value={memberEmail} onChange={(e) => setMemberEmail(e.target.value)} required />
-                  {["create", "update", "assign"].map((perm) => (
-                    <label key={perm} style={{ fontSize: 13 }}>
-                      <input
-                        type="checkbox"
-                        checked={memberPerms.includes(perm)}
-                        onChange={(e) =>
-                          setMemberPerms(
-                            e.target.checked
-                              ? [...memberPerms, perm]
-                              : memberPerms.filter((p) => p !== perm)
-                          )
-                        }
-                      />{" "}
-                      {perm}
-                    </label>
+        {/* ASSIGNMENTS TAB */}
+        {activeTab === "assignments" && (
+          <>
+            <div style={styles.card}>
+              <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: 17 }}>
+                {editingId ? "Edit Assignment" : "New Assignment"}
+              </h3>
+              <form
+                onSubmit={handleSaveAssignment}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                <input
+                  placeholder="Assignment Title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                  style={styles.input}
+                />
+                <input
+                  placeholder="Course Code (e.g. CSE309)"
+                  value={courseCode}
+                  onChange={(e) => setCourseCode(e.target.value)}
+                  required
+                  style={styles.input}
+                />
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  required
+                  style={styles.input}
+                />
+                <input
+                  placeholder="Notes / Description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  style={styles.input}
+                />
+                <select
+                  value={selectedGroupId}
+                  onChange={(e) => setSelectedGroupId(e.target.value)}
+                  style={styles.input}
+                >
+                  <option value="">Personal (Only Me)</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      Group: {g.name}
+                    </option>
                   ))}
-                  <button type="submit">Save Permissions</button>
-                </form>
-              )}
+                </select>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button type="submit" style={{ ...styles.primaryBtn, flex: 1 }}>
+                    {editingId ? "Update" : "Add Assignment"}
+                  </button>
+                  {editingId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(null);
+                        setTitle("");
+                        setCourseCode("");
+                        setDescription("");
+                        setDueDate("");
+                        setSelectedGroupId("");
+                      }}
+                      style={styles.secondaryBtn}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </form>
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* PROFILE & SESSIONS TAB */}
-      {activeTab === "profile" && (
-        <div style={{ display: "grid", gap: 24 }}>
-          <form onSubmit={handleUpdateProfile} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <label>Display Name:</label>
-            <input value={profileName} onChange={(e) => setProfileName(e.target.value)} required />
-            <button type="submit">Save Name</button>
-          </form>
+            <div style={styles.card}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                <h3 style={{ margin: 0, fontSize: 17 }}>Course Assignments ({assignments.length})</h3>
+              </div>
 
-          <form onSubmit={handleChangePassword} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <input type="password" placeholder="Current password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
-            <input type="password" placeholder="New password (min 6)" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} />
-            <button type="submit">Change Password</button>
-          </form>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                  <thead>
+                    <tr style={{ background: "#f8fafc", textAlign: "left", color: "#475569" }}>
+                      <th style={{ padding: "12px 14px", borderBottom: "1px solid #e2e8f0" }}>Title & Details</th>
+                      <th style={{ padding: "12px 14px", borderBottom: "1px solid #e2e8f0" }}>Course</th>
+                      <th style={{ padding: "12px 14px", borderBottom: "1px solid #e2e8f0" }}>Due Date</th>
+                      <th style={{ padding: "12px 14px", borderBottom: "1px solid #e2e8f0" }}>Visibility</th>
+                      <th style={{ padding: "12px 14px", borderBottom: "1px solid #e2e8f0" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assignments.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} style={{ padding: 24, textAlign: "center", color: "#64748b" }}>
+                          No assignments yet. Add your first course task above!
+                        </td>
+                      </tr>
+                    ) : (
+                      assignments.map((a) => (
+                        <tr key={a.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <td style={{ padding: "14px" }}>
+                            <strong style={{ display: "block", color: "#0f172a" }}>{a.title}</strong>
+                            {a.description && (
+                              <span style={{ fontSize: 12, color: "#64748b" }}>{a.description}</span>
+                            )}
+                          </td>
+                          <td style={{ padding: "14px" }}>
+                            <span
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: 6,
+                                background: "#eef2ff",
+                                color: "#4338ca",
+                                fontWeight: 600,
+                                fontSize: 12,
+                              }}
+                            >
+                              {a.course_code}
+                            </span>
+                          </td>
+                          <td style={{ padding: "14px", color: "#334155" }}>{a.due_date}</td>
+                          <td style={{ padding: "14px" }}>
+                            <span
+                              style={{
+                                padding: "4px 10px",
+                                borderRadius: 999,
+                                background: a.group_id ? "#ecfdf5" : "#f1f5f9",
+                                color: a.group_id ? "#047857" : "#475569",
+                                fontSize: 12,
+                                fontWeight: 600,
+                              }}
+                            >
+                              {a.group_id ? `Group #${a.group_id}` : "Personal"}
+                            </span>
+                          </td>
+                          <td style={{ padding: "14px" }}>
+                            <div style={{ display: "flex", gap: 8 }}>
+                              <button
+                                onClick={() => {
+                                  setEditingId(a.id);
+                                  setTitle(a.title);
+                                  setCourseCode(a.course_code);
+                                  setDescription(a.description || "");
+                                  setDueDate(a.due_date);
+                                  setSelectedGroupId(a.group_id ? String(a.group_id) : "");
+                                }}
+                                style={styles.secondaryBtn}
+                              >
+                                Edit
+                              </button>
+                              <button onClick={() => handleDeleteAssignment(a.id)} style={styles.dangerBtn}>
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
 
-          <div>
-            <h3>Active Refresh Sessions</h3>
-            {sessions.map((s) => (
-              <div key={s.id} style={{ display: "flex", justifyContent: "space-between", padding: 8, borderBottom: "1px solid #e2e8f0" }}>
-                <span>IP: {s.ip_address} — {s.user_agent}</span>
-                <button onClick={async () => { await apiFetch(`/auth/sessions/${s.id}`, { method: "DELETE" }); loadSessions(); }}>
-                  Revoke
-                </button>
+        {/* GROUPS & PERMISSIONS TAB */}
+        {activeTab === "groups" && (
+          <div style={styles.card}>
+            <h3 style={{ marginTop: 0 }}>Create Shared Study Group</h3>
+            <form
+              onSubmit={handleCreateGroup}
+              style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 24 }}
+            >
+              <input
+                placeholder="Group Name (e.g. CSE309 Project Team)"
+                value={groupName}
+                onChange={(e) => setGroupName(e.target.value)}
+                required
+                style={{ ...styles.input, flex: 1, minWidth: 200 }}
+              />
+              <input
+                placeholder="Description"
+                value={groupDesc}
+                onChange={(e) => setGroupDesc(e.target.value)}
+                style={{ ...styles.input, flex: 2, minWidth: 220 }}
+              />
+              <button type="submit" style={styles.primaryBtn}>
+                Create Group
+              </button>
+            </form>
+
+            {groups.map((g) => (
+              <div
+                key={g.id}
+                style={{
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 10,
+                  padding: 16,
+                  marginBottom: 14,
+                  background: "#f8fafc",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <strong style={{ fontSize: 15 }}>{g.name}</strong>
+                    {g.description && (
+                      <span style={{ color: "#64748b", marginLeft: 8, fontSize: 13 }}>— {g.description}</span>
+                    )}
+                  </div>
+                  {g.owner_id === user.id && (
+                    <button
+                      onClick={() => setActiveGroupId(activeGroupId === g.id ? null : g.id)}
+                      style={styles.secondaryBtn}
+                    >
+                      Manage Members
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ marginTop: 8, fontSize: 13, color: "#475569" }}>
+                  Members:{" "}
+                  {g.members.length === 0
+                    ? "Only owner"
+                    : g.members.map((m) => `${m.email} [${m.permissions.join(", ")}]`).join(" | ")}
+                </div>
+
+                {activeGroupId === g.id && (
+                  <form
+                    onSubmit={(e) => handleAddMember(e, g.id)}
+                    style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}
+                  >
+                    <input
+                      type="email"
+                      placeholder="Member email"
+                      value={memberEmail}
+                      onChange={(e) => setMemberEmail(e.target.value)}
+                      required
+                      style={{ ...styles.input, maxWidth: 240 }}
+                    />
+                    {(["create", "update", "assign"] as const).map((perm) => (
+                      <label key={perm} style={{ fontSize: 13, display: "flex", gap: 5, alignItems: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={memberPerms.includes(perm)}
+                          onChange={(e) =>
+                            setMemberPerms(
+                              e.target.checked
+                                ? [...memberPerms, perm]
+                                : memberPerms.filter((p) => p !== perm)
+                            )
+                          }
+                        />
+                        {perm}
+                      </label>
+                    ))}
+                    <button type="submit" style={styles.primaryBtn}>
+                      Save Permissions
+                    </button>
+                  </form>
+                )}
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ADMIN DASHBOARD TAB */}
-      {activeTab === "admin" && user.role === "admin" && (
-        <div style={{ display: "grid", gap: 24 }}>
-          {stats && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
-              <div style={{ padding: 12, background: "#f1f5f9", borderRadius: 8 }}>Users: <strong>{stats.total_users}</strong></div>
-              <div style={{ padding: 12, background: "#f1f5f9", borderRadius: 8 }}>Banned: <strong>{stats.banned_users}</strong></div>
-              <div style={{ padding: 12, background: "#f1f5f9", borderRadius: 8 }}>Records: <strong>{stats.total_records}</strong></div>
-              <div style={{ padding: 12, background: "#f1f5f9", borderRadius: 8 }}>Groups: <strong>{stats.total_groups}</strong></div>
-              <div style={{ padding: 12, background: "#f1f5f9", borderRadius: 8 }}>New (7d): <strong>{stats.new_users_7d}</strong></div>
+        {/* PROFILE & SESSIONS TAB */}
+        {activeTab === "profile" && (
+          <div style={{ display: "grid", gap: 20 }}>
+            <div style={styles.card}>
+              <h3 style={{ marginTop: 0 }}>Account Profile</h3>
+              <form onSubmit={handleUpdateProfile} style={{ display: "flex", gap: 10, maxWidth: 460 }}>
+                <input
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  required
+                  style={styles.input}
+                />
+                <button type="submit" style={styles.primaryBtn}>
+                  Save Name
+                </button>
+              </form>
+
+              {!isGuest && (
+                <>
+                  <h4 style={{ marginTop: 24, marginBottom: 10 }}>Change Password</h4>
+                  <form onSubmit={handleChangePassword} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <input
+                      type="password"
+                      placeholder="Current password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      required
+                      style={{ ...styles.input, maxWidth: 220 }}
+                    />
+                    <input
+                      type="password"
+                      placeholder="New password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      style={{ ...styles.input, maxWidth: 220 }}
+                    />
+                    <button type="submit" style={styles.primaryBtn}>
+                      Update Password
+                    </button>
+                  </form>
+                </>
+              )}
             </div>
-          )}
 
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => downloadCsv("users")}>Export Users CSV</button>
-            <button onClick={() => downloadCsv("records")}>Export Records CSV</button>
-            <button onClick={() => downloadCsv("activity")}>Export Activity CSV</button>
+            <div style={styles.card}>
+              <h3 style={{ marginTop: 0 }}>Active Refresh Sessions</h3>
+              {sessions.map((s) => (
+                <div
+                  key={s.id}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "12px 14px",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 8,
+                    marginBottom: 8,
+                    fontSize: 13,
+                  }}
+                >
+                  <span>
+                    <strong>IP:</strong> {s.ip_address} — {s.user_agent}
+                  </span>
+                  <button
+                    onClick={async () => {
+                      await apiFetch(`/auth/sessions/${s.id}`, { method: "DELETE" });
+                      loadSessions();
+                    }}
+                    style={styles.dangerBtn}
+                  >
+                    Revoke
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
+        )}
 
-          <div>
-            <h3>User Management</h3>
-            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-              <input placeholder="Search users..." value={userSearch} onChange={(e) => setUserSearch(e.target.value)} />
-              <button onClick={loadAdminData}>Search</button>
+        {/* ADMIN DASHBOARD TAB */}
+        {activeTab === "admin" && user.role === "admin" && (
+          <div style={styles.card}>
+            <h3 style={{ marginTop: 0 }}>Admin Governance & Analytics</h3>
+            {stats && (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                  gap: 12,
+                  marginBottom: 20,
+                }}
+              >
+                <div style={{ padding: 14, background: "#f8fafc", borderRadius: 10 }}>Users: {stats.total_users}</div>
+                <div style={{ padding: 14, background: "#f8fafc", borderRadius: 10 }}>
+                  Active: {stats.active_users}
+                </div>
+                <div style={{ padding: 14, background: "#f8fafc", borderRadius: 10 }}>
+                  Banned: {stats.banned_users}
+                </div>
+                <div style={{ padding: 14, background: "#f8fafc", borderRadius: 10 }}>
+                  Records: {stats.total_records}
+                </div>
+                <div style={{ padding: 14, background: "#f8fafc", borderRadius: 10 }}>
+                  Sessions: {stats.active_sessions}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+              <button onClick={() => downloadCsv("users")} style={styles.secondaryBtn}>
+                Export Users CSV
+              </button>
+              <button onClick={() => downloadCsv("records")} style={styles.secondaryBtn}>
+                Export Records CSV
+              </button>
+              <button onClick={() => downloadCsv("activity")} style={styles.secondaryBtn}>
+                Export Activity CSV
+              </button>
+            </div>
+
+            <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+              <input
+                placeholder="Search users..."
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                style={{ ...styles.input, maxWidth: 260 }}
+              />
+              <button onClick={loadAdminData} style={styles.primaryBtn}>
+                Search
+              </button>
               {selectedUserIds.length > 0 && (
                 <>
-                  <button onClick={async () => { await apiFetch("/admin/users/bulk-ban", { method: "POST", body: JSON.stringify({ ids: selectedUserIds }) }); setSelectedUserIds([]); loadAdminData(); }}>
+                  <button
+                    onClick={async () => {
+                      await apiFetch("/admin/users/bulk-ban", {
+                        method: "POST",
+                        body: JSON.stringify({ user_ids: selectedUserIds, is_banned: true }),
+                      });
+                      setSelectedUserIds([]);
+                      loadAdminData();
+                    }}
+                    style={styles.dangerBtn}
+                  >
                     Bulk Ban ({selectedUserIds.length})
                   </button>
-                  <button onClick={async () => { await apiFetch("/admin/users/bulk-unban", { method: "POST", body: JSON.stringify({ ids: selectedUserIds }) }); setSelectedUserIds([]); loadAdminData(); }}>
+                  <button
+                    onClick={async () => {
+                      await apiFetch("/admin/users/bulk-ban", {
+                        method: "POST",
+                        body: JSON.stringify({ user_ids: selectedUserIds, is_banned: false }),
+                      });
+                      setSelectedUserIds([]);
+                      loadAdminData();
+                    }}
+                    style={styles.secondaryBtn}
+                  >
                     Bulk Unban
                   </button>
                 </>
               )}
             </div>
 
-            <table width="100%" cellPadding={8} style={{ borderCollapse: "collapse", border: "1px solid #e2e8f0" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ background: "#f8fafc", textAlign: "left" }}>
-                  <th>Select</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th style={{ padding: 10 }}>Select</th>
+                  <th style={{ padding: 10 }}>Email</th>
+                  <th style={{ padding: 10 }}>Role</th>
+                  <th style={{ padding: 10 }}>Status</th>
+                  <th style={{ padding: 10 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {adminUsers.map((u) => (
                   <tr key={u.id} style={{ borderTop: "1px solid #e2e8f0" }}>
-                    <td>
+                    <td style={{ padding: 10 }}>
                       <input
                         type="checkbox"
                         checked={selectedUserIds.includes(u.id)}
@@ -591,27 +1142,37 @@ export function App() {
                         }
                       />
                     </td>
-                    <td>{u.email}</td>
-                    <td>{u.role}</td>
-                    <td>{u.is_banned ? `Banned (${u.ban_reason})` : "Active"}</td>
-                    <td style={{ display: "flex", gap: 6 }}>
+                    <td style={{ padding: 10 }}>{u.email}</td>
+                    <td style={{ padding: 10 }}>{u.role}</td>
+                    <td style={{ padding: 10 }}>{u.is_banned ? "Banned" : "Active"}</td>
+                    <td style={{ padding: 10, display: "flex", gap: 6 }}>
                       {u.id !== user.id && (
-                        <button onClick={async () => {
-                          await apiFetch(`/admin/users/${u.id}/role`, {
-                            method: "PATCH",
-                            body: JSON.stringify({ role: u.role === "admin" ? "user" : "admin" }),
-                          });
-                          loadAdminData();
-                        }}>
+                        <button
+                          onClick={async () => {
+                            await apiFetch(`/admin/users/${u.id}/role`, {
+                              method: "PATCH",
+                              body: JSON.stringify({ role: u.role === "admin" ? "user" : "admin" }),
+                            });
+                            loadAdminData();
+                          }}
+                          style={styles.secondaryBtn}
+                        >
                           Toggle Role
                         </button>
                       )}
                       {u.role !== "admin" && (
-                        u.is_banned ? (
-                          <button onClick={async () => { await apiFetch(`/admin/users/${u.id}/unban`, { method: "POST" }); loadAdminData(); }}>Unban</button>
-                        ) : (
-                          <button onClick={async () => { await apiFetch(`/admin/users/${u.id}/ban`, { method: "POST", body: JSON.stringify({ reason: "Admin ban" }) }); loadAdminData(); }}>Ban</button>
-                        )
+                        <button
+                          onClick={async () => {
+                            await apiFetch(`/admin/users/${u.id}/ban`, {
+                              method: "PATCH",
+                              body: JSON.stringify({ is_banned: !u.is_banned }),
+                            });
+                            loadAdminData();
+                          }}
+                          style={styles.dangerBtn}
+                        >
+                          {u.is_banned ? "Unban" : "Ban"}
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -619,27 +1180,8 @@ export function App() {
               </tbody>
             </table>
           </div>
-
-          {securityData && (
-            <div>
-              <h3>Security & Failed Logins</h3>
-              <p>Failed by IP: {JSON.stringify(securityData.failed_by_ip)}</p>
-              <p>Failed by Account: {JSON.stringify(securityData.failed_by_account)}</p>
-            </div>
-          )}
-
-          <div>
-            <h3>Audit Logs (Recent)</h3>
-            <div style={{ maxHeight: 240, overflowY: "auto", border: "1px solid #e2e8f0", padding: 8 }}>
-              {auditLogs.map((log) => (
-                <div key={log.id} style={{ fontSize: 13, padding: "4px 0", borderBottom: "1px solid #f1f5f9" }}>
-                  <strong>[{log.event_type}]</strong> {log.user_email} — {log.detail} (IP: {log.ip_address})
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 }
