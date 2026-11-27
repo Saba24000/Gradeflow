@@ -8,7 +8,7 @@ from auth import (
     log_audit,
 )
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 import auth, models
@@ -19,12 +19,12 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 class SignupRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    email: EmailStr
+    email: str = Field(..., min_length=3, max_length=255)
     password: str = Field(..., min_length=6)
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str = Field(..., min_length=3, max_length=255)
     password: str
 
 
@@ -68,64 +68,74 @@ def _issue_auth_response(
     }
 
 
-@router.post("/signup", status_code=201)
-def signup(
-    payload: SignupRequest,
-    request: Request,
-    response: Response,
-    db: Session = Depends(get_db),
-):
-    email_norm = payload.email.strip().lower()
-    if db.query(models.UserDB).filter(models.UserDB.email == email_norm).first():
+@router.post("/signup")
+def signup(payload: SignupRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    clean_email = payload.email.strip().lower()
+    clean_name = payload.name.strip()
+
+    if "@" not in clean_email or "." not in clean_email.split("@")[-1]:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address")
+    if not clean_name:
+        raise HTTPException(status_code=400, detail="Please enter your name")
+
+    existing = db.query(models.UserDB).filter(models.UserDB.email == clean_email).first()
+    if existing:
         raise HTTPException(status_code=400, detail="Email is already registered")
 
-    is_first_user = db.query(models.UserDB).count() == 0
-    role = "admin" if is_first_user else "user"
-
     user = models.UserDB(
-        name=payload.name.strip(),
-        email=email_norm,
-        hashed_password=auth.hash_password(payload.password),
-        role=role,
+        name=clean_name,
+        email=clean_email,
+        hashed_password=hash_password(payload.password),
+        role="user",
+        is_banned=False,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    auth.log_audit(db, "signup", user=user, detail=f"Registered as {role}", request=request)
-    return _issue_auth_response(response, user, db, request)
+    access_token = create_access_token(user)
+    refresh_token = create_refresh_session(db, user, request)
+    log_audit(db, "SIGNUP", user=user, detail="Account created", request=request)
 
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+        },
+    }
 
 @router.post("/login")
-def login(
-    payload: LoginRequest,
-    request: Request,
-    response: Response,
-    db: Session = Depends(get_db),
-):
-    email_norm = payload.email.strip().lower()
-    user = db.query(models.UserDB).filter(models.UserDB.email == email_norm).first()
+def login(payload: LoginRequest, request: Request, response: Response, db: Session = Depends(get_db)):
+    clean_email = payload.email.strip().lower()
+    user = db.query(models.UserDB).filter(models.UserDB.email == clean_email).first()
 
-    if not user or not auth.verify_password(payload.password, user.hashed_password):
-        auth.log_audit(
-            db,
-            "login_failed",
-            user=user,
-            user_email=email_norm,
-            detail="Invalid email or password",
-            request=request,
-        )
+    if not user or not verify_password(payload.password, user.hashed_password):
+        log_audit(db, "LOGIN_FAILED", user_email=clean_email, detail="Invalid credentials", request=request)
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if user.is_banned:
-        auth.log_audit(db, "login_blocked_banned", user=user, detail="Banned user login attempt", request=request)
-        raise HTTPException(
-            status_code=403,
-            detail=f"Account suspended: {user.ban_reason or 'Contact admin'}",
-        )
+        raise HTTPException(status_code=403, detail=f"Account suspended: {user.ban_reason or 'Policy violation'}")
 
-    auth.log_audit(db, "login_success", user=user, detail="User logged in", request=request)
-    return _issue_auth_response(response, user, db, request)
+    access_token = create_access_token(user)
+    refresh_token = create_refresh_session(db, user, request)
+    log_audit(db, "LOGIN_SUCCESS", user=user, detail="User logged in", request=request)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role,
+        },
+    }
 
 
 @router.post("/refresh")
