@@ -45,6 +45,10 @@ def init_db_and_seed():
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'user'",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN DEFAULT FALSE",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS ban_reason TEXT",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS institute VARCHAR(150) DEFAULT ''",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(120) DEFAULT ''",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT ''",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT ''",
             "ALTER TABLE assignments ADD COLUMN IF NOT EXISTS group_id INTEGER",
             "ALTER TABLE assignments ADD COLUMN IF NOT EXISTS owner_id INTEGER",
         ]
