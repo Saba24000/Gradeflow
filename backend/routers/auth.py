@@ -115,7 +115,61 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
         "token_type": "bearer",
         "user": serialize_user(user),
     }
+@router.post("/guest")
+def guest_login(request: Request, db: Session = Depends(get_db)):
+    guest_email = "guest@gradeflow.app"
+    guest_user = db.query(models.UserDB).filter(models.UserDB.email == guest_email).first()
 
+    if not guest_user:
+        guest_user = models.UserDB(
+            name="Guest Student",
+            email=guest_email,
+            hashed_password=hash_password("guest_demo_2026"),
+            role="user",
+            is_banned=False,
+            institute="Public Resource Library",
+        )
+        db.add(guest_user)
+        db.commit()
+        db.refresh(guest_user)
+
+    existing_count = (
+        db.query(models.AssignmentDB)
+        .filter(models.AssignmentDB.owner_id == guest_user.id)
+        .count()
+    )
+    if existing_count == 0:
+        sample_tasks = [
+            models.AssignmentDB(
+                title="JWT Authentication & RBAC Architecture Report",
+                course_code="CSE309",
+                description="Analyze stateless JWT rotation, role-based access control, and audit logging.",
+                due_date="2026-12-05",
+                status="pending",
+                owner_id=guest_user.id,
+            ),
+            models.AssignmentDB(
+                title="Relational Schema & Query Optimization Lab",
+                course_code="CSE303",
+                description="Normalize a multi-tenant academic database and benchmark indexed joins.",
+                due_date="2026-12-10",
+                status="pending",
+                owner_id=guest_user.id,
+            ),
+        ]
+        db.add_all(sample_tasks)
+        db.commit()
+
+    access_token = create_access_token(guest_user)
+    refresh_token = create_refresh_session(db, guest_user, request)
+    log_audit(db, "GUEST_LOGIN", user=guest_user, detail="Entered Guest Resource Library", request=request)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "user": serialize_user(guest_user),
+    }
 
 @router.get("/me")
 def get_me(current_user: models.UserDB = Depends(get_current_user)):
