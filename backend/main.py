@@ -48,18 +48,19 @@ def init_db_and_seed():
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS institute VARCHAR(150) DEFAULT ''",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(120) DEFAULT ''",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT ''",
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS",
+            "ALTER TABLE group_members ADD COLUMN IF NOT EXISTS role VARCHAR(20) DEFAULT 'editor'",
             "ALTER TABLE assignments ADD COLUMN IF NOT EXISTS file_name VARCHAR(255) DEFAULT ''",
             "ALTER TABLE assignments ADD COLUMN IF NOT EXISTS file_data TEXT DEFAULT ''",
             "ALTER TABLE assignments ADD COLUMN IF NOT EXISTS group_id INTEGER",
             "ALTER TABLE assignments ADD COLUMN IF NOT EXISTS owner_id INTEGER",
         ]
-        with engine.begin() as conn:
-            for stmt in alter_statements:
-                try:
+        
+        for stmt in alter_statements:
+            try:
+                with engine.begin() as conn:
                     conn.execute(text(stmt))
-                except Exception:
-                    pass
+            except Exception:
+                pass
 
         with Session(bind=engine) as db:
             for i in range(1, 6):
