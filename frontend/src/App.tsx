@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { ProfileDetailsSection } from "./components/ProfileDetailsSection";
 import {
   apiFetch,
   Assignment,
@@ -6,7 +7,7 @@ import {
   getStoredTokens,
   Group,
   saveAuthSession,
-  User,
+  User,   
 } from "./services/api";
 
 type ViewPage =
@@ -1500,29 +1501,14 @@ export function App() {
             <div style={{ display: "grid", gap: 20 }}>
               <div style={cardStyle}>
                 <h3 style={{ marginTop: 0 }}>Account Profile</h3>
-                <form onSubmit={handleUpdateProfile} style={{ display: "flex", gap: 10, maxWidth: 460 }}>
-                  <input
-                    value={profileName}
-                    onChange={(e) => setProfileName(e.target.value)}
-                    required
-                    style={inputStyle}
-                  />
-                  <button
-                    type="submit"
-                    style={{
-                      padding: "10px 18px",
-                      borderRadius: 8,
-                      border: "none",
-                      background: "#2563eb",
-                      color: "#fff",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    Save Name
-                  </button>
-                </form>
+                {user && (
+  <ProfileDetailsSection
+    user={user}
+    token={localStorage.getItem("access_token") || localStorage.getItem("token") || ""}
+    onUserUpdated={(updated) => setUser(updated)}
+    notify={notify}
+  />
+)}
 
                 <h4 style={{ marginTop: 24, marginBottom: 10 }}>Change Password</h4>
                 <form onSubmit={handleChangePassword} style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
