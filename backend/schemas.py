@@ -23,7 +23,9 @@ class AssignmentBase(BaseModel):
     due_date: str
     status: Optional[str] = "pending"
     group_id: Optional[int] = None
-    assigned_to_id: Optional[int] = None
+    assigned_to_id: Optional[int] = None 
+    file_name: Optional[str] = ""
+    file_data: Optional[str] = ""
 
 
 class AssignmentCreate(AssignmentBase):
@@ -37,7 +39,9 @@ class AssignmentUpdate(BaseModel):
     due_date: Optional[str] = None
     status: Optional[str] = None
     group_id: Optional[int] = None
-    assigned_to_id: Optional[int] = None
+    assigned_to_id: Optional[int] = None 
+    file_name: Optional[str] = None
+    file_data: Optional[str] = None
 
 
 class AssignmentResponse(AssignmentBase):

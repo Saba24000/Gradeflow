@@ -50,6 +50,8 @@ export function App() {
   const [dueDate, setDueDate] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [attachedFileName, setAttachedFileName] = useState("");
+const [attachedFileData, setAttachedFileData] = useState("");
 
   // Groups state
   const [groups, setGroups] = useState<Group[]>([]);
@@ -301,6 +303,8 @@ export function App() {
         due_date: dueDate,
         status: "pending",
         group_id: selectedGroupId ? Number(selectedGroupId) : null,
+        file_name: attachedFileName,
+      file_data: attachedFileData,
       };
       if (editingId) {
         await apiFetch(`/assignments/${editingId}`, {
@@ -320,6 +324,8 @@ export function App() {
       setDescription("");
       setDueDate("");
       setSelectedGroupId("");
+      setAttachedFileName("");
+    setAttachedFileData("");
       setEditingId(null);
       loadCoreData();
     } catch (err: any) {
@@ -1094,6 +1100,44 @@ export function App() {
                         <option value="__new__">+ Create New Group...</option>
                       </optgroup>
                     </select>
+                    
+<label
+  style={{
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "10px 14px",
+    borderRadius: 8,
+    border: "1px dashed #94a3b8",
+    background: "#f8fafc",
+    fontSize: 13,
+    fontWeight: 600,
+    color: "#1e293b",
+    cursor: "pointer",
+  }}
+>
+  📎 {attachedFileName ? attachedFileName : "Attach PDF (max 3MB)"}
+  <input
+    type="file"
+    accept="application/pdf,.pdf"
+    style={{ display: "none" }}
+    onChange={(e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 3 * 1024 * 1024) {
+        notify("Please select a PDF under 3 MB");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAttachedFileName(file.name);
+        setAttachedFileData(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }}
+  />
+</label>
+<div style={{ display: "flex", gap: 8 }}></div>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button
                         type="submit"

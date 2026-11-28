@@ -19,8 +19,12 @@ export interface Assignment {
   status: string;
   owner_id: number;
   group_id: number | null;
-  assigned_to_id: number | null;
+  assigned_to_id: number | null; 
+  file_name?: string;
+  file_data?: string;
 }
+
+
 
 export interface GroupMember {
   user_id: number;
