@@ -1083,7 +1083,7 @@ export function App() {
                         <option value="">Personal (Only Me)</option>
                       </optgroup>
                       <optgroup label="Shared Study Groups">
-                        {groups.map((g) => (
+                        {(Array.isArray(groups) ? groups : []).map((g) => (
                           <option key={g.id} value={g.id}>
                             Group: {g.name}
                           </option>
@@ -1400,7 +1400,7 @@ export function App() {
                 </form>
               )}
 
-              {groups.map((g) => (
+              {(Array.isArray(groups) ? groups : []).map((g) => (
                 <div
                   key={g.id}
                   style={{
